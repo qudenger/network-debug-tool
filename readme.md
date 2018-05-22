@@ -1,39 +1,24 @@
 ## tcp网络调试助手 web版
 
-为解决嵌入式设备调试TCP协议无法连接内网TCP Server，此程序可部署在服务器上，通过web页面进行tcp消息的接收和发送。
+此程序为方便嵌入式设备调试TCP协议，部署在linux服务器上，通过web页面即可进行tcp消息的接收和发送。
 
-#### 编译：
+![截图](https://raw.githubusercontent.com/qudenger/network-debug-tool/master/screen-print.jpg)
 
-CGO_ENABLED=0 GOOS=linux go build -o tcpsrv ./*.go
+#### 编译与部署：
 
-CGO_ENABLED=0 GOOS=linux go build -o tcpweb ./*.go
+以linux服务为例：
 
-#### 部署：
-
-目录结构
-
-tcp 
-
-  tcpsrv
-
-web
-
-  tcpweb
-
-public
-
-  assets
-
-  index.html
-
-
+```
 cd tcp
-
+CGO_ENABLED=0 GOOS=linux go build -o tcpsrv ./*.go
 nohup ./tcpsrv &
+```
 
+```
 cd web
-
+CGO_ENABLED=0 GOOS=linux go build -o tcpweb ./*.go
 nohup ./tcpweb &
+```
 
 #### 使用:
 
@@ -41,10 +26,5 @@ nohup ./tcpweb &
 
 web访问地址： http://serverip:1234
 
-
-#### 截图：
-
-![截图](https://raw.githubusercontent.com/qudenger/network-debug-tool/master/screen-print.jpg)
-
-#### docker:
+#### 使用docker部署:
 
