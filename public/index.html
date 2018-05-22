@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TCP Debug Tool</title>
+    <script src="./static/js/jquery-2.1.4.min.js"></script>
+    <script type="text/javascript" src="./static/js/w2ui.min.js"></script>
+    <script type="text/javascript" src="./static/js/protobuf.min.js"></script>
+    <script type="text/javascript" src="./static/js/moment.min.js"></script>
+    <!-- Required for non-UTF encodings -->
+    <script src="./static/js/encoding-indexes.js"></script>
+    <script src="./static/js/encoding.js"></script>
+    <link rel="stylesheet" type="text/css" href="./static/css/w2ui.min.css" />
+    <link rel="stylesheet" type="text/css" href="./static/css/style.css" />
+    <script type="text/javascript">
+
+
+    var pstyle = 'border: 1px solid #dfdfdf;';
+    var config = {
+      layout: {
+            name: 'layout',
+            panels: [
+                //头部
+                { type: 'top', size: '70',resizable: false, style: pstyle, hidden: false, title: '<center>网络调试助手 web版</center>',
+                  toolbar :{
+                    items: [
+                        { type: 'html',  id: 'tb-protocol',
+                            html: function (item) {
+                                var html =
+                                  '<div style="padding: 3px 10px;">'+
+                                  '协议类型:'+
+                                  '    <input size="10" onchange="" '+
+                                  '         style="padding: 3px; border-radius: 2px; border: 1px solid silver" value="TCP Server" readonly/>'+
+                                  '</div>';
+                                return html;
+                            }
+                        },
+                        { type: 'html',  id: 'tb-server-ip',
+                            html: function (item) {
+                                var html =
+                                  '<div style="padding: 3px 10px;">'+
+                                  '服务器IP:'+
+                                  '    <input size="10" onchange="" '+
+                                  '         style="padding: 3px; border-radius: 2px; border: 1px solid silver" value="127.0.0.1" readonly/>'+
+                                  '</div>';
+                                return html;
+                            }
+                        },
+                        { type: 'html',  id: 'tb-server-port',
+                            html: function (item) {
+                                var html =
+                                  '<div style="padding: 3px 10px;">'+
+                                  '服务器端口:'+
+                                  '    <input size="10" onchange="" '+
+                                  '         style="padding: 3px; border-radius: 2px; border: 1px solid silver" value="12345" readonly/>'+
+                                  '</div>';
+                                return html;
+                            }
+                        },
+                    ],
+                    onClick: function (event) {
+                        console.log('Target: '+ event.target, event);
+                    }
+                  },
+                  content: ''
+                },
+                //左侧
+                { type: 'left', size: '20%', resizable: true,content: ''},
+                { type: 'main', size: '80%',resizable: true,style:"background:black;",
+                  content:`<div id="output" style="width:100%;height:100%;"> </div>`
+
+                },
+                { type: 'preview',  size:'40%',resizable: true, hidden: false, style: pstyle,
+                  content:'' },
+                { type: 'right', hidden: true,  overflow: 'hidden'},
+                { type: 'bottom', size: 50, resizable: true, hidden: true, style: pstyle, content: 'bottom' }
+            ]
+        },
+        sidebar :{
+          name       : 'sidebar',
+            topHTML    : '<div style="background-color: #eee; padding: 10px 5px; border-bottom: 1px solid silver">已连接的客户端</div>',
+            bottomHTML : '<div style="height: 35px; background-color: #eee; padding: 10px 5px; border-top: 1px solid silver; color: #777;"></div>',
+            nodes : [
+              // { id: 'level-1-1', text: 'Level 1.1', icon: 'fa-home' },
+              // { id: 'level-1-2', text: 'Level 1.2', icon: 'fa-coffee' },
+              // { id: 'level-1-3', text: 'Level 1.3', icon: 'fa-comment-alt' }
+            ],
+            onClick: function (event) {
+              currentClient = event.target;
+            }
+        },
+
+        form:{
+            name   : 'form',
+            header : '',
+            style: 'border: 0px;',
+            formHTML:
+            '<div class="w2ui-page page-0">'+
+            '    <div style="width: 100%; height: 100%; resize: none">'+
+            '            <textarea name="input" type="text" style="width: 100%; height: 100%; resize: none" id="input" class="w2ui-input" placeholder="目前只支持按照十六进制发送，且数据格式为：12 34 56"></textarea>'+
+            '    </div>'+
+            '</div>'+
+            '<div class="w2ui-buttons">'+
+            '   <button class="w2ui-btn w2ui-btn-green" name="publish">发送</button>'+
+            '    <button class="w2ui-btn " name="reset">清空</button>'+
+            '</div>',
+            // fields : [
+            //     { field: 'comments',   type: 'textarea', html: { caption: 'Comments', attr: 'style="width: 100%; height: 90px"' } }
+            // ],
+            actions: {
+                'publish': function (event) {
+                    console.log('publish');
+                    if(currentClient == null){
+                        lock("请先选中目标客户端");
+                        return;
+                    }
+                    var target = currentClient
+                    var input = hexStringToByte (document.getElementById('input').value);
+
+                    protobuf.load("./static/js/proto.json", function(err, root) {
+                              if (err) throw err;
+                              console.info(root);
+                              // 找到proto中定义的模块
+                              var msgProto = root.lookupType("Message");
+                              // 对这个模块进行数据装载
+                              var payload = { cmd: "SendMsgToClient" ,sender:"",receiver:currentClient, body:input};
+                              // 检查装载的数据和模块是否正确
+                              var errMsg = msgProto.verify(payload);
+                              if (errMsg)
+                                  throw Error(errMsg);
+                              // 创建消息
+                              var rawreq = msgProto.create(payload);
+                              // 编码
+                              var req = msgProto.encode(rawreq).finish();
+                              websocket.send(req);
+                              // // 解码
+                              // var message = msgProto.decode(buffer);
+                              // console.info("decode",message);
+                              // var buf = ouhot.net.buffer(null);
+                              // buf.writeUTF("UserModel");
+                              // var data = buf.merge(buffer);
+                              // // console.info("data",data);
+                              // websocket.binaryType = 'arraybuffer'
+                              // websocket.send(data);
+                    });
+                },
+                'reset': function (event) {
+                    console.log('clear');
+                    document.getElementById('input').value = "";
+                }
+            }
+        }
+    }
+
+    function lock(msg) {
+      // w2utils.lock($('#view-container'), { msg:msg, spinner: false, opacity : 1 });
+      // setTimeout(function () { w2utils.unlock($('#view-container')); }, 1000);
+      w2popup.open({
+          width     : 300,
+          height    : 50,
+          body: '<div class="w2ui-centered">'+msg+'</div>'
+      });
+      setTimeout(function () { w2popup.close(); }, 1000);
+    }
+
+    var currentClient = null;
+    var websocket;
+    $(document).ready(init);
+    function init() {
+        if(!("WebSocket" in window)){
+            output('<span style="color: red;">websockets are not supported </span>');
+
+        } else {
+            output('<span style="color: green;">websockets are supported </span>');
+            connect();
+        };
+    };
+
+    function connect()
+    {
+        var wsHost = "ws://" + window.location.host + "/ws";
+        websocket = new WebSocket(wsHost);
+        websocket.binaryType = "arraybuffer";
+        // websocket.binaryType = "blob";
+        websocket.onopen = function(evt) { onOpen(evt) };
+        websocket.onclose = function(evt) { onClose(evt) };
+        websocket.onmessage = function(evt) { onMessage(evt) };
+        websocket.onerror = function(evt) { onError(evt) };
+    };
+
+    function disconnect() {
+        websocket.close();
+    };
+
+    function onOpen(evt) {
+        // 可以弄一个指示灯显示征程连接
+        protobuf.load("./static/js/proto.json", function(err, root) {
+                if (err) throw err;
+                console.info(root);
+                // 找到proto中定义的模块
+                var msgProto = root.lookupType("Message");
+                // 对这个模块进行数据装载
+                var payload = { cmd: "GetClientList" ,sender:"",receiver:"", body:""};
+                // 检查装载的数据和模块是否正确
+                var errMsg = msgProto.verify(payload);
+                if (errMsg)
+                    throw Error(errMsg);
+                // 创建消息
+                var rawreq = msgProto.create(payload);
+                // 编码
+                var req = msgProto.encode(rawreq).finish();
+                websocket.send(req);
+                // // 解码
+                // var message = msgProto.decode(buffer);
+                // console.info("decode",message);
+                // var buf = ouhot.net.buffer(null);
+                // buf.writeUTF("UserModel");
+                // var data = buf.merge(buffer);
+                // // console.info("data",data);
+                // websocket.binaryType = 'arraybuffer'
+                // websocket.send(data);
+      });
+
+
+    };
+
+    function onClose(evt) {
+        // 红色的指示灯显示已经断开连接
+        showScreen('<span style="color: red;">DISCONNECTED </span>');
+    };
+
+    function onError(evt) {
+        showScreen('<span style="color: red;">ERROR: ' + evt.data+ '</span>');
+    };
+
+    function showScreen(txt) {
+        output(txt);
+    };
+
+    function onMessage(evt) {
+      if(evt.data instanceof ArrayBuffer){
+        protobuf.load("./static/js/proto.json", function(err, root) {
+          // 找到proto中定义的模块
+          var msgProto = root.lookupType("Message");
+          // tip: 注意此处要先将 var byteArray = new Uint8Array(arrayBuffer);   然后再decode byteArray.
+            try {
+            var rsp = msgProto.decode(new Uint8Array(evt.data));
+            console.log(rsp.cmd);
+            switch(rsp.cmd)
+            {
+              case "GetClientList":
+                  // rsp body是个字符串数组的形式，可解析成json数组
+                  var bodyString = new TextDecoder("utf-8").decode(rsp.body);
+                  var clients = JSON.parse(bodyString);
+                  //将获取到的客户端展示在左侧的sidebar中
+                  for (var i in clients) {
+                    w2ui.sidebar.add({ id: clients[i], text: clients[i], icon: 'fa-home' });
+                  }
+                  break;
+              case "AddNewClient":
+
+                  var newClient = new TextDecoder("utf-8").decode(rsp.body);
+                  w2ui.sidebar.add({ id: newClient, text: newClient, icon: 'fa-home' });
+                  break;
+              case "ClientClose":
+
+                  var closedClient = new TextDecoder("utf-8").decode(rsp.body);
+                  w2ui.sidebar.remove(closedClient);
+                  break;
+              case "ReceiveMsg":
+                  // 显示在 output中
+                  var out = document.getElementById('output');
+                  out.innerHTML += '<span style="color:red;">【来自连接地址：' + rsp.sender + '】</span><br><span style="color:white;">' + byteToHexString(rsp.body) + '</span><br><br>';
+                  break;
+              default:
+                  console.log("cmd default")
+            }
+          } catch(e) {
+              console.log("未能正常解析成json");
+          }
+        });
+        }
+    }
+
+    function output(message) {
+        var currentTime = "<span class='time'>" +  moment().format('HH:mm:ss.SSS') + "</span>";
+        var element = $("<div>" + currentTime + "<font style=\"color:red;\">=></font>  " + message + "</div>");
+        $('#console').prepend(element);
+    };
+
+    // 二进制转成十六进制的
+    function byteToHexString(uint8arr) {
+      if (!uint8arr) {
+        return '';
+      }
+
+      var hexStr = '';
+      for (var i = 0; i < uint8arr.length; i++) {
+        var hex = (uint8arr[i] & 0xff).toString(16);
+        hex = (hex.length === 1) ? '0' + hex : hex;
+        hex = hex + " ";
+        hexStr += hex;
+      }
+
+      return hexStr.toUpperCase();
+    }
+
+    // todo:十六进制字符串转二进制, 进一步改善支持连写，现在支持的格式是： 12 23 45
+    function hexStringToByte(str) {
+      str = str.trim()
+      if (!str) {
+        return new Uint8Array();
+      }
+      var strs= new Array(); //定义一数组
+      strs=str.split(" "); //字符分割
+      var a = [];
+      for (i=0;i<strs.length ;i++ )
+      {
+        a.push(parseInt(strs[i].substr(0,2),16));
+      }
+      return new Uint8Array(a);
+    }
+
+    $(function () {
+      $('#layout').w2layout(config.layout);
+      w2ui.layout.content('top', $().w2toolbar(config.toolbar));
+      w2ui.layout.content('left', $().w2sidebar(config.sidebar));
+      w2ui.layout.content('preview', $('').w2form(config.form));
+    });
+  </script>
+</head>
+<body>
+
+  <div id="layout" style="position: absolute; width: 100%; height: 100%;"></div>
+
+</body>
+</html>

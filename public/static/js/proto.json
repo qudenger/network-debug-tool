@@ -1,0 +1,24 @@
+{
+  "nested": {
+    "Message": {
+      "fields": {
+        "cmd": {
+          "type": "string",
+          "id": 1
+        },
+        "sender": {
+          "type": "string",
+          "id": 2
+        },
+        "receiver": {
+          "type": "string",
+          "id": 3
+        },
+        "body": {
+          "type": "bytes",
+          "id": 4
+        }
+      }
+    }
+  }
+}
