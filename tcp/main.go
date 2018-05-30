@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	msgProto "hyptek.com/hvac/tcpserver/tcp/proto"
+	msgProto "github.com/qudenger/network-debug-tool/tcp/proto"
 )
 
 // 广播所有的
