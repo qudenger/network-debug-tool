@@ -11,6 +11,7 @@
     <script src="./static/js/encoding.js"></script>
     <link rel="stylesheet" type="text/css" href="./static/css/w2ui.min.css" />
     <link rel="stylesheet" type="text/css" href="./static/css/style.css" />
+    <link rel="stylesheet" type="text/css" href="./static/font/css/font-awesome.min.css" />
     <script type="text/javascript">
 
 
@@ -56,9 +57,15 @@
                                 return html;
                             }
                         },
+                        { type: 'break'},
+                        { type: 'button',  id: 'tb-clear-output',  caption: '清屏', icon: 'fa fa-trash' },
                     ],
                     onClick: function (event) {
                         console.log('Target: '+ event.target, event);
+                        if(event.target == 'tb-clear-output'){
+                            var out = document.getElementById('output');
+                            out.innerHTML = "";
+                        }
                     }
                   },
                   content: ''
@@ -251,13 +258,14 @@
                   // rsp body是个字符串数组的形式，可解析成json数组
                   var bodyString = new TextDecoder("utf-8").decode(rsp.body);
                   var clients = JSON.parse(bodyString);
+                  console.log(clients);
                   //将获取到的客户端展示在左侧的sidebar中
                   for (var i in clients) {
                     w2ui.sidebar.add({ id: clients[i], text: clients[i], icon: 'fa-home' });
                   }
                   break;
               case "AddNewClient":
-
+                  console.log('addnew');
                   var newClient = new TextDecoder("utf-8").decode(rsp.body);
                   w2ui.sidebar.add({ id: newClient, text: newClient, icon: 'fa-home' });
                   break;
