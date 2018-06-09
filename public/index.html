@@ -16,6 +16,8 @@
 
 
     var pstyle = 'border: 1px solid #dfdfdf;';
+    var loopTimer = "";
+    var loopTimes = 0;
     var config = {
       layout: {
             name: 'layout',
@@ -77,6 +79,36 @@
 
                 },
                 { type: 'preview',  size:'40%',resizable: true, hidden: false, style: pstyle,
+                    toolbar: {
+                        items: [
+                            { type: 'check', id: 'tb-loop-toggle',caption: '', icon: 'fa fa-clock-o',checked: false, onClick:function(){
+                                
+                                // w2ui['layout'].get('preview').toolbar.hide('toolbar-input-h1', 'toolbar-input-h2');
+                                // // $("#div-h1-input").hide();
+                                // // $("#div-h2-input").hide();
+                            }},
+                            { type: 'html',  id: 'tb-loop-time', hidden:true,
+                                html: function (item) {
+                                    var html =
+                                    '<div id="div-h1-input" style="padding: 2px 10px;">时间间隔:'+
+                                    '    <input size="10" id="input-interval-time" '+
+                                    '       onKeyUp="this.value=this.value.replace(/\\\D/g,\'\')"'+
+                                    '         style="padding: 3px; border-radius: 2px; border: 1px solid #b9b9b9 !important; outline:none;" value="'+ (item.value || '') + '"/> 秒  <button id="tb-loop-start" class="w2ui-btn w2ui-btn-green" onclick="startLoop()">确定</button> <button id="tb-loop-cancel" style="display:none;" class="w2ui-btn" onclick="cancelLoop()">取消</button>'+
+                                    '</div>';
+                                    return html;
+                                }
+                            },
+                        ],
+                        onClick: function (event) {
+                            if (event.target == 'tb-loop-toggle') {
+                                if (!this.get('tb-loop-toggle').checked) {
+                                    this.show('tb-loop-time');
+                                }else{
+                                    this.hide('tb-loop-time');
+                                }
+                            }
+                        }
+                    },
                   content:'' },
                 { type: 'right', hidden: true,  overflow: 'hidden'},
                 { type: 'bottom', size: 50, resizable: true, hidden: true, style: pstyle, content: 'bottom' }
@@ -242,6 +274,66 @@
     function showScreen(txt) {
         output(txt);
     };
+
+    function startLoop(){
+        // 开始循环发送消息
+        // 初始化一些页面元素
+        $('#input-interval-time').attr("disabled",true);
+        $('#tb-loop-start').hide();
+        $('#tb-loop-cancel').show();
+        //intervalTime = parseInt($("#input-interval-time").val()) * 1000 * 60;
+        intervalTime = parseInt($("#input-interval-time").val()) * 1000;
+        loopTimer = window.setInterval(loopSendMsg,intervalTime); 
+    }
+
+    function cancelLoop(){
+        $('#tb-loop-cancel').hide();
+        $('#tb-loop-start').show();
+        $('#input-interval-time').attr("disabled",false);
+        w2ui['layout'].get('preview').toolbar.hide('tb-loop-time');
+        w2ui['layout'].get('preview').toolbar.click('tb-loop-toggle');
+        // w2ui['layout'].get('preview').toolbar['tb-loop-toggle').checked = false;
+       
+        window.clearInterval(loopTimer);
+        loopTimes = 0;
+    }
+
+    function loopSendMsg(){
+        loopTimes++;
+        if(loopTimes % 100 == 0){
+            // 清除output屏幕
+            var out = document.getElementById('output');
+            out.innerHTML = "";
+        }
+        console.log('publish');
+        if(currentClient == null){
+            lock("请先选中目标客户端");
+            return;
+        }
+        var target = currentClient
+        var input = hexStringToByte (document.getElementById('input').value);
+
+        protobuf.load("./static/js/proto.json", function(err, root) {
+            if (err) throw err;
+            console.info(root);
+            // 找到proto中定义的模块
+            var msgProto = root.lookupType("Message");
+            // 对这个模块进行数据装载
+            var payload = { cmd: "SendMsgToClient" ,sender:"",receiver:currentClient, body:input};
+            // 检查装载的数据和模块是否正确
+            var errMsg = msgProto.verify(payload);
+            if (errMsg)
+                throw Error(errMsg);
+            // 创建消息
+            var rawreq = msgProto.create(payload);
+            // 编码
+            var req = msgProto.encode(rawreq).finish();
+            websocket.send(req);
+
+        });
+    }
+
+
 
     function onMessage(evt) {
       if(evt.data instanceof ArrayBuffer){
