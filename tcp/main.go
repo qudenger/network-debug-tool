@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -121,13 +122,15 @@ func doReceiveMsg(conns *map[string]net.Conn, from string, body []byte) error {
 
 func doSendMsgToClient(conns *map[string]net.Conn, target string, body []byte) error {
 	// todo: 判断这些参数不能为空的情况
-	fmt.Println("target:" + target)
-
+	// 判断conns中的客户端是否已经断开连接
+	if (*conns)[target] == nil {
+		return errors.New("the client has disconnected")
+	}
 	_, err := (*conns)[target].Write(body)
 	if err != nil {
-		fmt.Println(err.Error())
+		return err
 	}
-	return err
+	return nil
 }
 
 func main() {
