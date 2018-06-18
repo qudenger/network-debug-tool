@@ -3,7 +3,10 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 )
+
+var timeout = 600 // 超时60秒，自动断开连接
 
 // Client holds info about connection
 type Client struct {
@@ -25,22 +28,31 @@ func (c *Client) listen() {
 	buf := make([]byte, 1024)
 
 	for {
-		lenght, err := c.conn.Read(buf)
-		// if checkError(err, "Connection") == false {
-		// 	conn.Close()
-		// 	break
-		// }
+		length, err := c.conn.Read(buf)
 		if err != nil {
+			// 这种属于正常断开连接的情况：发送了EOF
+			LogErr(c.conn.RemoteAddr().String(), " connection error: ", err)
 			c.conn.Close()
 			c.Server.onClientConnectionClosed(c, err)
 			return
 		}
-		if lenght > 0 {
-			buf[lenght] = 0
+		if length > 0 {
+			buf[length] = 0
 		}
-		//fmt.Println("Rec[",conn.RemoteAddr().String(),"] Say :" ,string(buf[0:lenght]))
-		//reciveStr := string(buf[0:lenght])
-		c.Server.onNewMessage(c, buf[0:lenght])
+		log.Println("-----=======" + c.conn.RemoteAddr().String())
+		Data := (buf[:length])
+		messnager := make(chan byte)
+		//心跳计时 没有加入websocket代理的定时发送心跳机制
+
+		if !strings.HasPrefix(c.conn.RemoteAddr().String(), "127.0.0.1") {
+			log.Println("不是127的")
+			go HeartBeating(c.conn, messnager, timeout)
+			//检测每次Client是否有数据传来 // todo: 排除掉对127.0.0.1的连接
+			go GravelChannel(c, Data, messnager)
+		} else {
+			c.Server.onNewMessage(c, buf[0:length])
+		}
+
 	}
 
 	// reader := bufio.NewReader(c.conn)
@@ -103,19 +115,9 @@ func (s *server) Listen() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("==============================000000000000")
-			log.Println(err)
-			// if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			// 	log.Printf("NOTICE: temporary Accept() failure - %s", err.Error())
-			// 	runtime.Gosched()
-			// 	continue
-			// }
-			// // theres no direct way to detect this error because it is not exposed
-			// if !strings.Contains(err.Error(), "use of closed network connection") {
-			// 	log.Printf("ERROR: listener.Accept() - %s", err.Error())
-			// }
-			// break
+			continue
 		}
+		Log(conn.RemoteAddr().String(), " tcp connect success")
 		client := &Client{
 			conn:   conn,
 			Server: s,

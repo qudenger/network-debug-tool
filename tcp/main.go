@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
 	msgProto "github.com/qudenger/network-debug-tool/tcp/proto"
 )
+
+var conns = make(map[string]net.Conn)
 
 // 广播所有的
 func echoHandler(conns *map[string]net.Conn, msg string) {
@@ -32,21 +35,17 @@ func doGetClientList(receiver string, conns *map[string]net.Conn) error {
 			clients = append(clients, key)
 		}
 	}
-
 	clientsArray, err := json.Marshal(clients)
 	if err != nil {
 		clientsArray = nil
 	}
-
 	msg := &msgProto.Message{ // 使用辅助函数设置域的值
 		Cmd:      "GetClientList",
 		Sender:   "tcp-server",
 		Receiver: receiver,
 		Body:     clientsArray,
 	}
-
 	result, _ := proto.Marshal(msg)
-
 	_, err = (*conns)[receiver].Write(result)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -58,7 +57,6 @@ func doAddNewClient(conns *map[string]net.Conn, clientAddr string) {
 	for key, value := range *conns {
 		// 如果是本地web下的客户端：
 		if strings.HasPrefix(key, "127.0.0.1") {
-
 			msg := &msgProto.Message{ // 使用辅助函数设置域的值
 				Cmd:      "AddNewClient",
 				Sender:   "tcp-server",
@@ -137,7 +135,6 @@ func main() {
 
 	server := New("0.0.0.0:12345")
 
-	conns := make(map[string]net.Conn)
 	// 如果是127.0.0.1的客户端就不要注册了，属于tcp server的代理；
 	server.OnNewClient(func(c *Client) {
 		conns[c.conn.RemoteAddr().String()] = c.conn
@@ -145,14 +142,12 @@ func main() {
 			doAddNewClient(&conns, c.conn.RemoteAddr().String())
 		}
 	})
-	server.OnNewMessage(func(c *Client, message []byte) {
 
+	server.OnNewMessage(func(c *Client, message []byte) {
 		// 只要是来自127.0.0.1的连接都是websocket端，那么按照protobuf进行解析
 		fromProxy := strings.HasPrefix(c.conn.RemoteAddr().String(), "127.0.0.1")
-
 		if fromProxy {
 			fmt.Println("来自本机的客户端")
-
 			req := &msgProto.Message{}
 			parserErr := proto.Unmarshal(message, req)
 			if parserErr != nil {
@@ -174,36 +169,13 @@ func main() {
 		} else {
 			from := c.conn.RemoteAddr().String()
 			doReceiveMsg(&conns, from, message)
-
 		}
-
-		// if strings.HasPrefix(c.conn.RemoteAddr().String(), "127.0.0.1") {
-		// 	fmt.Println("来自本机的客户端")
-		// 	//都该有:{"cmd":"***"}
-		// 	var request map[string]interface{}
-		// 	err := json.Unmarshal([]byte(message), &request)
-		// 	if err == nil {
-		// 		if request["cmd"].(string) == "GetClientList" {
-		// 			fmt.Println("0000")
-		// 			c.Send(GetClientList(&conns))
-		// 		} else if request["cmd"].(string) == "SendMsgToClient" {
-		// 			fmt.Println("1111")
-		// 			target := request["target"].(string)
-		// 			msg := request["msg"].(string)
-		// 			SendMsgToClient(&conns, target, msg)
-		// 		}
-		// 	}
-		// } else {
-		// 	from := c.conn.RemoteAddr().String()
-		// 	ReceiveMsg(&conns, from, message)
-		// }
-		// fmt.Println(message)
-
-		fmt.Println(message)
 	})
+
 	server.OnClientConnectionClosed(func(c *Client, err error) {
 		// connection with client lost
 		//c.Send("closed")
+		log.Println("close close")
 		from := c.conn.RemoteAddr().String()
 		doClientClose(&conns, from)
 
