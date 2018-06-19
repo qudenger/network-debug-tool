@@ -49,6 +49,7 @@ func (c *Client) listen() {
 			go HeartBeating(c.conn, messnager, timeout)
 			//检测每次Client是否有数据传来 // todo: 排除掉对127.0.0.1的连接
 			go GravelChannel(c, Data, messnager)
+			c.Server.onNewMessage(c, buf[0:length])
 		} else {
 			c.Server.onNewMessage(c, buf[0:length])
 		}
